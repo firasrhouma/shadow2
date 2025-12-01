@@ -1,26 +1,42 @@
-name: Backend CI
+name: Backend CI/CD
 
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
-        with:
-          java-version: 17
-          distribution: "temurin"
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
 
-      - name: Build Spring Boot Backend
-        working-directory: backend
-        run: mvn -B package --file pom.xml
+    - name: Build Spring Boot backend
+      working-directory: backend
+      run: mvn clean package -DskipTests
 
+    - name: Copy JAR to Azure VM
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.VM_HOST }}
+        username: ${{ secrets.VM_USER }}
+        key: ${{ secrets.VM_SSH_KEY }}
+        source: "backend/target/*.jar"
+        target: "/home/firas/shadow2/backend-app.jar"
+
+    - name: Restart backend on VM
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.VM_HOST }}
+        username: ${{ secrets.VM_USER }}
+        key: ${{ secrets.VM_SSH_KEY }}
+        script: |
+          pkill -f "backend-app.jar" || true
+          nohup java -jar /home/firas/shadow2/backend-app.jar > /home/firas/shadow2/backend.log 2>&1 &
