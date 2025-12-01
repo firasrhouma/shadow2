@@ -18,11 +18,11 @@ jobs:
         node-version: 18
 
     - name: Install dependencies
-      working-directory: frontend
+      working-directory: eCommerce-spring-angular-main/frontend
       run: npm install
 
     - name: Build Angular app
-      working-directory: frontend
+      working-directory: eCommerce-spring-angular-main/frontend
       run: npm run build --if-present
 
     - name: Deploy frontend to Azure VM (nginx)
@@ -31,7 +31,7 @@ jobs:
         host: ${{ secrets.VM_HOST }}
         username: ${{ secrets.VM_USER }}
         key: ${{ secrets.VM_SSH_KEY }}
-        source: "frontend/dist/**"
+        source: "eCommerce-spring-angular-main/frontend/dist/**"
         target: "/var/www/html/"
 
     - name: Restart nginx
@@ -41,3 +41,4 @@ jobs:
         username: ${{ secrets.VM_USER }}
         key: ${{ secrets.VM_SSH_KEY }}
         script: sudo systemctl restart nginx
+
