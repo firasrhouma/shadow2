@@ -1,47 +1,75 @@
 name: Deploy to Azure VM
 
 on:
-  workflow_dispatch:   # Déclenché MANUELLEMENT seulement
+  workflow_dispatch:   # Lancer manuellement
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      # 1) Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # -------- BACKEND (Spring Boot) ----------
-      - name: Set up JDK 17
+      # ------------------- BACKEND BUILD -------------------
+      - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: 17
 
-      - name: Build backend
-        working-directory: eCommerce-spring-angular-main/backend
-        run: mvn -DskipTests clean package
+      - name: Build Spring Boot backend
+        run: |
+          cd backend
+          mvn clean package -DskipTests
 
-      # -------- FRONTEND (Angular) ----------
-      - name: Set up Node.js
+      # ------------------- FRONTEND BUILD -------------------
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: 18
 
-      - name: Install & build Angular
-        working-directory: eCommerce-spring-angular-main/frontend
+      - name: Build Angular frontend
         run: |
-          npm ci
-          npm run build -- --configuration production
+          cd frontend
+          npm install
+          npm run build
 
-      # -------- COPIE SUR LA VM (SAFE) ----------
+      # ------------------- COPY TO VM -------------------
       - name: Copy artifacts to Azure VM
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
+          username: ${{ secrets.VM_USERNAME }}
           key: ${{ secrets.VM_SSH_KEY }}
           source: |
-            eCommerce-spring-angular-main/backend/target/*.jar
-            eCommerce-spring-angular-main/frontend/dist/**
-          target: /home/firas/deploy_shadow2
+            backend/target/*.jar
+            frontend/dist/**
+          target: /home/firas/shadow2/
+
+      # ------------------- RUN SERVICES ON VM -------------------
+      - name: Deploy on Azure VM
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USERNAME }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            echo "Starting deploy..."
+
+            cd /home/firas/shadow2
+
+            # Kill old backend process
+            pkill -f "java -jar" || true
+
+            # Restart backend
+            nohup java -jar backend*.jar > backend.log 2>&1 &
+
+            echo "Backend restarted."
+
+            # Move frontend to nginx folder
+            sudo rm -rf /var/www/html/*
+            sudo cp -r frontend/dist/* /var/www/html/
+
+            echo "Frontend deployed successfully."
