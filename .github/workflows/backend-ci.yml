@@ -2,35 +2,47 @@ name: Backend CI/CD
 
 on:
   push:
-    branches: ["main"]
+    branches: [ "main" ]
 
 jobs:
-  deploy-backend:
+  build-deploy-backend:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout
+
+    # 1. Checkout source code
+    - name: Checkout code
       uses: actions/checkout@v3
 
+    # 2. Setup Java
     - name: Set up JDK 17
       uses: actions/setup-java@v3
       with:
-        java-version: 17
-        distribution: temurin
+        java-version: '17'
+        distribution: 'temurin'
 
+    # 3. Build JAR
     - name: Build backend
-      working-directory: eCommerce-spring-angular-main/backend
-      run: mvn clean package -DskipTests
+      run: |
+        cd eCommerce-spring-angular-main/backend
+        mvn clean package -DskipTests
 
-    - name: Copy JAR to VM
+    # 4. Copy JAR to root folder before sending to VM
+    - name: Move JAR to workspace root
+      run: |
+        cp eCommerce-spring-angular-main/backend/target/*.jar backend-latest.jar
+
+    # 5. Upload new backend to VM
+    - name: Upload JAR to Azure VM
       uses: appleboy/scp-action@v0.1.4
       with:
         host: ${{ secrets.VM_HOST }}
         username: ${{ secrets.VM_USER }}
         key: ${{ secrets.VM_SSH_KEY }}
-        source: "eCommerce-spring-angular-main/backend/target/spring-boot-ecommerce-0.0.1-SNAPSHOT.jar"
-        target: "/home/firas/shadow2/backend-app.jar"
+        source: "backend-latest.jar"
+        target: "/home/${{ secrets.VM_USER }}/shadow2/"
 
+    # 6. Restart backend on VM (VERSION SANS ERREURS)
     - name: Restart backend on VM
       uses: appleboy/ssh-action@v1.0.3
       with:
@@ -39,9 +51,16 @@ jobs:
         key: ${{ secrets.VM_SSH_KEY }}
         script: |
           echo "Stopping old backend..."
-          pkill -f "backend-app.jar" || true
+          pkill -f "backend-app.jar" >/dev/null 2>&1 || true
+          sleep 2
 
-          echo "Starting new backend..."
-          nohup java -jar /home/firas/shadow2/backend-app.jar > /home/firas/shadow2/backend.log 2>&1 &
+          echo "Deploying new JAR..."
+          rm -f /home/${USER}/shadow2/backend-app.jar
+          cp /home/${USER}/shadow2/backend-latest.jar /home/${USER}/shadow2/backend-app.jar
+
+          echo "Starting backend..."
+          cd /home/${USER}/shadow2
+          nohup java -jar backend-app.jar > backend.log 2>&1 &
 
           echo "Backend restarted successfully."
+          exit 0
