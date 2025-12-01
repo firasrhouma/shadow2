@@ -9,21 +9,32 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
+    # =========================
+    # 1) Clone repository
+    # =========================
     - name: Checkout code
       uses: actions/checkout@v3
 
+    # =========================
+    # 2) Setup JDK
+    # =========================
     - name: Set up JDK 17
       uses: actions/setup-java@v3
       with:
+        java-version: '17'
         distribution: 'temurin'
-        java-version: 17
 
+    # =========================
+    # 3) Build Spring Boot backend
+    # =========================
     - name: Build Spring Boot backend
       working-directory: eCommerce-spring-angular-main/backend
       run: mvn clean package -DskipTests
 
-    - name: Copy JAR to Azure VM
+    # =========================
+    # 4) Copy JAR to Azure VM
+    # =========================
+    - name: Upload JAR to Azure VM
       uses: appleboy/scp-action@v0.1.4
       with:
         host: ${{ secrets.VM_HOST }}
@@ -32,6 +43,9 @@ jobs:
         source: "eCommerce-spring-angular-main/backend/target/*.jar"
         target: "/home/${{ secrets.VM_USER }}/shadow2/"
 
+    # =========================
+    # 5) Restart backend on VM
+    # =========================
     - name: Restart backend on VM
       uses: appleboy/ssh-action@v1.0.3
       with:
@@ -40,13 +54,13 @@ jobs:
         key: ${{ secrets.VM_SSH_KEY }}
         script: |
           echo "Stopping old backend..."
-          pkill -f "backend-app.jar" || true
+          pkill -f "backend-app.jar" 2>/dev/null || true
 
           echo "Renaming new JAR..."
-          mv /home/${{ secrets.VM_USER }}/shadow2/*.jar /home/${{ secrets.VM_USER }}/shadow2/backend-app.jar || true
+          mv /home/${USER}/shadow2/*.jar /home/${USER}/shadow2/backend-app.jar || true
 
           echo "Starting backend..."
-          nohup java -jar /home/${{ secrets.VM_USER }}/shadow2/backend-app.jar > /home/${{ secrets.VM_USER }}/shadow2/backend.log 2>&1 &
+          nohup java -jar /home/${USER}/shadow2/backend-app.jar > /home/${USER}/shadow2/backend.log 2>&1 &
 
           echo "Backend started successfully."
 
