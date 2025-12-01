@@ -31,7 +31,7 @@ jobs:
         host: ${{ secrets.VM_HOST }}
         username: ${{ secrets.VM_USER }}
         key: ${{ secrets.VM_SSH_KEY }}
-        source: "eCommerce-spring-angular-main/frontend/dist/**"
+        source: "eCommerce-spring-angular-main/frontend/dist/angular-ecommerce/**"
         target: "/var/www/html/"
 
     - name: Restart nginx
