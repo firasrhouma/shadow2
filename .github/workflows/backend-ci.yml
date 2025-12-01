@@ -9,19 +9,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    # --- 1) Récupérer le code ---
     - name: Checkout code
       uses: actions/checkout@v3
 
+    # --- 2) Installer JDK 17 ---
     - name: Set up JDK 17
       uses: actions/setup-java@v3
       with:
-        java-version: '17'
-        distribution: 'temurin'
+        java-version: 17
+        distribution: "temurin"
 
+    # --- 3) Build Maven ---
     - name: Build Spring Boot backend
       working-directory: eCommerce-spring-angular-main/backend
       run: mvn clean package -DskipTests
 
+    # --- 4) Copier le .jar vers la VM ---
     - name: Copy JAR to Azure VM
       uses: appleboy/scp-action@v0.1.4
       with:
@@ -29,8 +33,9 @@ jobs:
         username: ${{ secrets.VM_USER }}
         key: ${{ secrets.VM_SSH_KEY }}
         source: "eCommerce-spring-angular-main/backend/target/*.jar"
-        target: "/home/firas/shadow2/"
+        target: "/home/${{ secrets.VM_USER }}/shadow2/"
 
+    # --- 5) Redémarrer backend correctement ---
     - name: Restart backend on VM
       uses: appleboy/ssh-action@v1.0.3
       with:
@@ -41,11 +46,20 @@ jobs:
           echo "Stopping old backend..."
           pkill -f "backend-app.jar" 2>/dev/null || true
 
-          echo "Renaming new JAR..."
-          mv /home/firas/shadow2/*.jar /home/firas/shadow2/backend-app.jar || true
+          echo "Selecting latest JAR..."
+          JAR_FILE=$(ls -t /home/${USER}/shadow2/*.jar | grep -v "backend-app.jar" | head -n 1)
+          
+          if [ -z "$JAR_FILE" ]; then
+            echo "ERROR: No new JAR found!"
+            exit 1
+          fi
 
-          echo "Starting backend..."
-          nohup java -jar /home/firas/shadow2/backend-app.jar > /home/firas/shadow2/backend.log 2>&1 &
+          echo "Renaming $JAR_FILE to backend-app.jar"
+          mv "$JAR_FILE" /home/${USER}/shadow2/backend-app.jar
 
-          echo "Backend started successfully."
+          echo "Starting backend (detached)..."
+          cd /home/${USER}/shadow2
+          setsid nohup java -jar backend-app.jar > backend.log 2>&1 < /dev/null &
+
+          echo "Backend restarted successfully."
           exit 0
