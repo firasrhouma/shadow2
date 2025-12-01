@@ -31,13 +31,18 @@ jobs:
         host: ${{ secrets.VM_HOST }}
         username: ${{ secrets.VM_USER }}
         key: ${{ secrets.VM_SSH_KEY }}
-        source: "eCommerce-spring-angular-main/frontend/dist/angular-ecommerce/**"
+        source: "eCommerce-spring-angular-main/frontend/dist/angular-ecommerce/*"
         target: "/var/www/html/"
+        strip_components: 3
 
     - name: Restart nginx
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.VM_HOST }}
+        username: ${{ secrets.VM_USER }}
+        key: ${{ secrets.VM_SSH_KEY }}
+        script: sudo systemctl restart nginx
+ }}
         username: ${{ secrets.VM_USER }}
         key: ${{ secrets.VM_SSH_KEY }}
         script: sudo systemctl restart nginx
