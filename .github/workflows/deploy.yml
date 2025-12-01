@@ -1,54 +1,62 @@
 name: Deploy to Azure VM
 
 on:
-  workflow_dispatch:   # Lancer manuellement
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Checkout code
+      # Checkout
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ------------------- BACKEND BUILD -------------------
+      # ------- BACKEND -------
       - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: 17
 
-      - name: Build Spring Boot backend
+      - name: Build backend
         run: |
           cd backend
           mvn clean package -DskipTests
 
-      # ------------------- FRONTEND BUILD -------------------
+      # ------- FRONTEND -------
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      - name: Build Angular frontend
+      - name: Build frontend
         run: |
           cd frontend
           npm install
           npm run build
 
-      # ------------------- COPY TO VM -------------------
-      - name: Copy artifacts to Azure VM
+      # ------- COPY BACKEND -------
+      - name: Copy backend JAR to VM
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USERNAME }}
           key: ${{ secrets.VM_SSH_KEY }}
-          source: |
-            backend/target/*.jar
-            frontend/dist/**
-          target: /home/firas/shadow2/
+          source: "backend/target/*jar"
+          target: "/home/firas/shadow2/backend"
 
-      # ------------------- RUN SERVICES ON VM -------------------
+      # ------- COPY FRONTEND -------
+      - name: Copy Angular build to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USERNAME }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          source: "frontend/dist/**"
+          target: "/home/firas/shadow2/frontend"
+
+      # ------- DEPLOY ON VM -------
       - name: Deploy on Azure VM
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -56,20 +64,13 @@ jobs:
           username: ${{ secrets.VM_USERNAME }}
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
-            echo "Starting deploy..."
+            echo "Deploying..."
 
-            cd /home/firas/shadow2
-
-            # Kill old backend process
+            cd /home/firas/shadow2/backend
             pkill -f "java -jar" || true
+            nohup java -jar *.jar > backend.log 2>&1 &
 
-            # Restart backend
-            nohup java -jar backend*.jar > backend.log 2>&1 &
-
-            echo "Backend restarted."
-
-            # Move frontend to nginx folder
             sudo rm -rf /var/www/html/*
-            sudo cp -r frontend/dist/* /var/www/html/
+            sudo cp -r /home/firas/shadow2/frontend/* /var/www/html/
 
-            echo "Frontend deployed successfully."
+            echo "Deployment finished."
