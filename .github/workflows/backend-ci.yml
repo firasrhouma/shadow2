@@ -3,23 +3,23 @@ name: Backend CI/CD
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch:
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
+
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Setup JDK 17
+    - name: Set up JDK 17
       uses: actions/setup-java@v3
       with:
         distribution: 'temurin'
         java-version: 17
 
-    - name: Build Spring Boot JAR
+    - name: Build Spring Boot backend
       working-directory: eCommerce-spring-angular-main/backend
       run: mvn clean package -DskipTests
 
@@ -30,8 +30,7 @@ jobs:
         username: ${{ secrets.VM_USER }}
         key: ${{ secrets.VM_SSH_KEY }}
         source: "eCommerce-spring-angular-main/backend/target/*.jar"
-        target: "/home/firas/shadow2/"
-        strip_components: 3
+        target: "/home/${{ secrets.VM_USER }}/shadow2/"
 
     - name: Restart backend on VM
       uses: appleboy/ssh-action@v1.0.3
@@ -42,9 +41,13 @@ jobs:
         script: |
           echo "Stopping old backend..."
           pkill -f "backend-app.jar" || true
-          
+
           echo "Renaming new JAR..."
-          mv /home/firas/shadow2/*.jar /home/firas/shadow2/backend-app.jar
+          mv /home/${{ secrets.VM_USER }}/shadow2/*.jar /home/${{ secrets.VM_USER }}/shadow2/backend-app.jar || true
 
           echo "Starting backend..."
-          nohup java -jar /home/firas/shadow2/backend-app.jar > /home/firas/shadow2/backend.log 2>&1 &
+          nohup java -jar /home/${{ secrets.VM_USER }}/shadow2/backend-app.jar > /home/${{ secrets.VM_USER }}/shadow2/backend.log 2>&1 &
+
+          echo "Backend started successfully."
+
+          exit 0
