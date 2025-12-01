@@ -40,3 +40,5 @@ jobs:
         script: |
           pkill -f "backend-app.jar" || true
           nohup java -jar /home/firas/shadow2/backend-app.jar > /home/firas/shadow2/backend.log 2>&1 &
+d-app.jar" || true
+          nohup java -jar /home/firas/shadow2/backend-app.jar > /home/firas/shadow2/backend.log 2>&1 &
