@@ -19,7 +19,7 @@ jobs:
         distribution: 'temurin'
 
     - name: Build Spring Boot backend
-      working-directory: backend
+      working-directory: eCommerce-spring-angular-main/backend
       run: mvn clean package -DskipTests
 
     - name: Copy JAR to Azure VM
@@ -28,7 +28,7 @@ jobs:
         host: ${{ secrets.VM_HOST }}
         username: ${{ secrets.VM_USER }}
         key: ${{ secrets.VM_SSH_KEY }}
-        source: "backend/target/*.jar"
+        source: "eCommerce-spring-angular-main/backend/target/*.jar"
         target: "/home/firas/shadow2/backend-app.jar"
 
     - name: Restart backend on VM
