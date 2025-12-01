@@ -29,7 +29,7 @@ jobs:
         username: ${{ secrets.VM_USER }}
         key: ${{ secrets.VM_SSH_KEY }}
         source: "eCommerce-spring-angular-main/backend/target/*.jar"
-        target: "/home/${{ secrets.VM_USER }}/shadow2/backend-latest.jar"
+        target: "/home/${{ secrets.VM_USER }}/shadow2/"
 
     - name: Restart backend on VM
       uses: appleboy/ssh-action@v1.0.3
@@ -42,15 +42,19 @@ jobs:
           pkill -f backend-app.jar >/dev/null 2>&1 || true
           sleep 2
 
-          echo "Deploying new jar..."
-          mv /home/${USER}/shadow2/backend-latest.jar \
-             /home/${USER}/shadow2/backend-app.jar || true
+          echo "Selecting latest JAR..."
+          LATEST=$(ls -t /home/${USER}/shadow2/*.jar | grep -v "backend-app.jar" | head -n 1)
+          if [ -z "$LATEST" ]; then
+            echo "No new JAR found"
+            exit 1
+          fi
+
+          echo "Deploying new JAR: $LATEST"
+          mv "$LATEST" /home/${USER}/shadow2/backend-app.jar
 
           echo "Starting backend..."
           cd /home/${USER}/shadow2
           nohup java -jar backend-app.jar > backend.log 2>&1 < /dev/null &
 
           echo "Backend is UP ✔"
-
-          # Empêche l'erreur 143 (appleboy bug)
           exit 0 || true
